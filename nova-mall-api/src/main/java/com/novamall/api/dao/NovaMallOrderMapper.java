@@ -12,6 +12,7 @@ import com.novamall.api.entity.NovaMallOrder;
 import com.novamall.api.util.PageQueryUtil;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.Date;
 import java.util.List;
 
 public interface NovaMallOrderMapper {
@@ -40,4 +41,8 @@ public interface NovaMallOrderMapper {
     int closeOrder(@Param("orderIds") List<Long> orderIds, @Param("orderStatus") int orderStatus);
 
     int checkDone(@Param("orderIds") List<Long> asList);
+
+    List<NovaMallOrder> selectTimeoutPrePayOrders(@Param("expireTime") Date expireTime, @Param("limit") int limit);
+
+    int closeOrderIfPrePay(@Param("orderId") Long orderId, @Param("orderStatus") int orderStatus);
 }

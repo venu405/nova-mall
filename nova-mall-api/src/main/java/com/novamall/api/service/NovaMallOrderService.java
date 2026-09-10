@@ -17,6 +17,7 @@ import com.novamall.api.entity.NovaMallOrder;
 import com.novamall.api.util.PageQueryUtil;
 import com.novamall.api.util.PageResult;
 
+import java.util.Date;
 import java.util.List;
 
 public interface NovaMallOrderService {
@@ -64,6 +65,23 @@ public interface NovaMallOrderService {
     String finishOrder(String orderNo, Long userId);
 
     String paySuccess(String orderNo, int payType);
+
+    /**
+     * 查询超时未支付的待支付订单
+     *
+     * @param expireTime 创建时间早于该时间点的订单视为超时
+     * @param limit      单次扫描的最大订单数
+     * @return
+     */
+    List<NovaMallOrder> getTimeoutPrePayOrders(Date expireTime, int limit);
+
+    /**
+     * 超时自动取消订单并回补库存
+     *
+     * @param orderId
+     * @return true-取消成功；false-订单已被支付或关闭，无需处理
+     */
+    Boolean cancelOrderByTimeout(Long orderId);
 
     String saveOrder(MallUser loginMallUser, MallUserAddress address, List<NovaMallShoppingCartItemVO> itemsForSave);
 

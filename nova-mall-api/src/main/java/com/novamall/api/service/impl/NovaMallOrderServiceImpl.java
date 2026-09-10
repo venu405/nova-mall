@@ -12,6 +12,8 @@ import com.novamall.api.api.mall.vo.NovaMallOrderDetailVO;
 import com.novamall.api.api.mall.vo.NovaMallOrderItemVO;
 import com.novamall.api.api.mall.vo.NovaMallOrderListVO;
 import com.novamall.api.api.mall.vo.NovaMallShoppingCartItemVO;
+import com.novamall.api.cache.CacheConstants;
+import com.novamall.api.cache.NovaMallCacheService;
 import com.novamall.api.common.*;
 import com.novamall.api.dao.*;
 import com.novamall.api.entity.*;
@@ -20,6 +22,8 @@ import com.novamall.api.util.BeanUtil;
 import com.novamall.api.util.NumberUtil;
 import com.novamall.api.util.PageQueryUtil;
 import com.novamall.api.util.PageResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +39,8 @@ import static java.util.stream.Collectors.groupingBy;
 @Service
 public class NovaMallOrderServiceImpl implements NovaMallOrderService {
 
+    private static final Logger logger = LoggerFactory.getLogger(NovaMallOrderServiceImpl.class);
+
     @Autowired
     private NovaMallOrderMapper novaMallOrderMapper;
     @Autowired
@@ -45,6 +51,8 @@ public class NovaMallOrderServiceImpl implements NovaMallOrderService {
     private NovaMallGoodsMapper novaMallGoodsMapper;
     @Autowired
     private NovaMallOrderAddressMapper novaMallOrderAddressMapper;
+    @Autowired
+    private NovaMallCacheService cacheService;
 
     @Override
     public NovaMallOrderDetailVO getOrderDetailByOrderId(Long orderId) {
@@ -276,6 +284,38 @@ public class NovaMallOrderServiceImpl implements NovaMallOrderService {
         return ServiceResultEnum.SHOPPING_ITEM_ERROR.getResult();
     }
 
+
+    @Override
+    public List<NovaMallOrder> getTimeoutPrePayOrders(Date expireTime, int limit) {
+        return novaMallOrderMapper.selectTimeoutPrePayOrders(expireTime, limit);
+    }
+
+    @Override
+    @Transactional
+    public Boolean cancelOrderByTimeout(Long orderId) {
+        // 乐观条件更新：WHERE 中带 order_status=待支付，与支付成功/手动关闭并发时只有一个能生效
+        int closeResult = novaMallOrderMapper.closeOrderIfPrePay(orderId, NovaMallOrderStatusEnum.ORDER_CLOSED_BY_EXPIRED.getOrderStatus());
+        if (closeResult <= 0) {
+            // 影响行数为 0，订单已被支付或关闭，跳过不处理
+            return false;
+        }
+        // 关闭成功后回补库存，取消+回补在同一事务内
+        List<NovaMallOrderItem> orderItems = novaMallOrderItemMapper.selectByOrderId(orderId);
+        if (!CollectionUtils.isEmpty(orderItems)) {
+            List<StockNumDTO> stockNumDTOS = BeanUtil.copyList(orderItems, StockNumDTO.class);
+            int addBackResult = novaMallGoodsMapper.addBackStockNum(stockNumDTOS);
+            if (addBackResult < 1) {
+                logger.error("订单超时取消回补库存失败，orderId={}", orderId);
+                NovaMallException.fail(ServiceResultEnum.DB_ERROR.getResult());
+            }
+            for (NovaMallOrderItem orderItem : orderItems) {
+                logger.info("订单超时取消回补库存，orderId={}，goodsId={}，数量={}", orderId, orderItem.getGoodsId(), orderItem.getGoodsCount());
+                // 库存已变化，删除商品详情缓存使前台立即拿到最新库存（首页配置 VO 不含库存字段，无需处理）
+                cacheService.delete(CacheConstants.GOODS_DETAIL_KEY + orderItem.getGoodsId());
+            }
+        }
+        return true;
+    }
 
     @Override
     public PageResult getNovaMallOrdersPage(PageQueryUtil pageUtil) {

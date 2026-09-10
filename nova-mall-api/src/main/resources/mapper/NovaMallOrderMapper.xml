@@ -227,6 +227,19 @@ Copyright (c) 2019-2021 十三 all rights reserved.
                  open="(" separator="," close=")">#{item}
         </foreach>
     </update>
+    <select id="selectTimeoutPrePayOrders" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from tb_novamall_order
+        where order_status = 0 and is_deleted = 0 and create_time &lt;= #{expireTime,jdbcType=TIMESTAMP}
+        order by create_time asc
+        limit #{limit,jdbcType=INTEGER}
+    </select>
+    <update id="closeOrderIfPrePay">
+        update tb_novamall_order
+        set order_status = #{orderStatus,jdbcType=TINYINT},update_time = now()
+        where order_id = #{orderId,jdbcType=BIGINT} and order_status = 0 and is_deleted = 0
+    </update>
     <update id="updateByPrimaryKeySelective" parameterType="com.novamall.api.entity.NovaMallOrder">
         update tb_novamall_order
         <set>

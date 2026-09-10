@@ -38,6 +38,16 @@ mvn spring-boot:run
 
 服务默认端口为 `28019`。
 
+### 前端
+
+```bash
+cd nova-mall-vue3-app
+npm install
+npm run dev
+```
+
+构建生产产物使用 `npm run build`，产物输出至 `dist/`。
+
 ## 缓存设计
 
 后端通过 Redis 对读多写少的热点数据做缓存，整体实现位于 `com.novamall.api.cache` 包，业务侧通过 `NovaMallCacheService` 接口访问，由 `novamall.cache.enabled` 配置项做条件装配（关闭时装配空实现，应用不依赖 Redis 也能启动）。
@@ -48,15 +58,14 @@ mvn spring-boot:run
 - **缓存一致性**：后台管理端修改商品、上下架商品、增删改轮播图与首页配置时，同步删除对应缓存（单 key 删除或按前缀批量删除），保证管理端改完前台立即生效。
 - **降级**：缓存读写异常时捕获并降级为直接查询数据库，缓存故障不影响主流程。
 
-### 前端
+## 订单超时自动取消
 
-```bash
-cd nova-mall-vue3-app
-npm install
-npm run dev
-```
+待支付订单超过 `novamall.order.pay-timeout-minutes`（默认 30 分钟，可配置，演示时可调小）未支付时，由定时任务自动取消并回补库存，实现位于 `com.novamall.api.task.OrderTimeoutTask` 与 `NovaMallOrderServiceImpl.cancelOrderByTimeout`。
 
-构建生产产物使用 `npm run build`，产物输出至 `dist/`。
+- **定时扫描**：基于 Spring `@Scheduled` 每分钟扫描一次，筛选创建时间早于超时阈值、状态为待支付的订单，单批最多处理 100 笔。
+- **状态乐观条件**：取消 SQL 为 `UPDATE ... SET order_status=超时关闭 WHERE order_id=? AND order_status=待支付`，与用户手动取消、支付成功并发时只有一个能生效，影响行数为 0 则直接跳过。
+- **原子回补**：库存回补使用 `stock_num = stock_num + #{num}` 的原子 SQL（`NovaMallGoodsMapper.addBackStockNum`），与下单时 `stock_num = stock_num - #{num} AND stock_num >= #{num}` 的乐观扣减对称。
+- **事务与容错**：单笔订单的取消与回补在同一事务内，回补失败抛异常回滚；单批逐单 try-catch，单笔失败不影响其他订单，等待下一轮扫描重试。
 
 ## License
 

@@ -48,6 +48,8 @@ public interface NovaMallGoodsMapper {
 
     int recoverStockNum(@Param("stockNumDTOS") List<StockNumDTO> stockNumDTOS);
 
+    int addBackStockNum(@Param("stockNumDTOS") List<StockNumDTO> stockNumDTOS);
+
     int batchUpdateSellStatus(@Param("orderIds")Long[] orderIds,@Param("sellStatus") int sellStatus);
 
 }
