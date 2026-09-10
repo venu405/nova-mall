@@ -4308,7 +4308,7 @@ export const prefix = (url) => {
   if (url && url.startsWith('http')) {
     return url
   } else {
-    url = `http://backend-api-01.novamall.ltd${url}`
+    url = `${import.meta.env.MODE == 'development' ? 'http://localhost:28019' : 'http://backend-api-01.novamall.ltd'}${url}`
     return url
   }
 }
