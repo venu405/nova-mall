@@ -67,6 +67,26 @@ npm run dev
 - **原子回补**：库存回补使用 `stock_num = stock_num + #{num}` 的原子 SQL（`NovaMallGoodsMapper.addBackStockNum`），与下单时 `stock_num = stock_num - #{num} AND stock_num >= #{num}` 的乐观扣减对称。
 - **事务与容错**：单笔订单的取消与回补在同一事务内，回补失败抛异常回滚；单批逐单 try-catch，单笔失败不影响其他订单，等待下一轮扫描重试。
 
+## 自动化测试
+
+后端核心链路配有接口级自动化测试（JUnit 5 + Spring Boot Test，`@SpringBootTest` 随机端口 + TestRestTemplate 走真实 HTTP 请求），位于 `nova-mall-api/src/test/java/com/novamall/api/`，共 5 个测试类 7 个用例：
+
+- **UserApiTest**：注册 → 登录 → 带 token 访问鉴权接口；未带 token 访问受保护接口返回 416。
+- **GoodsCacheApiTest**：商品详情首次查询回源写缓存、二次查询命中缓存；查询不存在的商品返回业务错误并写入 TTL ≤ 60 秒的空值缓存（防穿透断言）。
+- **OrderFlowApiTest**：加购物车 → 创建地址 → 下单全链路，校验库存原子扣减数量与订单待支付状态。
+- **OrderTimeoutTest**：下单后将创建时间改为 40 分钟前，触发定时任务扫描，校验订单超时关闭、库存回补、商品详情缓存清除。
+- **ConcurrentOrderTest**：库存 5 件、8 个用户并发下单，校验恰好 5 单成功、库存扣到 0 不为负（防超卖）。
+
+测试与生产完全隔离：使用独立数据库 `novamall_db_test`（由 `novamall_db_schema.sql` 初始化）与 Redis database 1，随机端口启动，不影响 28019 端口的运行实例。
+
+```bash
+# 首次运行前初始化测试库
+mysql -h127.0.0.1 -uroot -proot -e "CREATE DATABASE IF NOT EXISTS novamall_db_test DEFAULT CHARSET utf8mb4;"
+mysql -h127.0.0.1 -uroot -proot novamall_db_test < src/main/resources/novamall_db_schema.sql
+# 运行测试（可重复执行，用例内自动重置库存并清理缓存 key）
+mvn test
+```
+
 ## License
 
 本项目基于 [newbee-mall](https://github.com/newbee-ltd/newbee-mall) 二次开发，遵循其开源协议；各子项目目录中保留原 LICENSE 文件，版权归原作者所有。
