@@ -158,7 +158,7 @@ public class NovaMallAiAssistantServiceImpl implements NovaMallAiAssistantServic
         }
         List<String> lines = new ArrayList<>();
         for (String line : content.split("\n")) {
-            String cleaned = line.trim().replaceAll("^[-*•\\d.、\\s]+", "").trim();
+            String cleaned = line.trim().replaceAll("^\\s*(?:[-*•]+|\\d+\\s*[.、)])\\s*", "").trim();
             if (StringUtils.hasText(cleaned)) {
                 lines.add(cleaned);
             }
