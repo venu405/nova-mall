@@ -16,6 +16,12 @@ public class CacheConstants {
     /** 首页配置商品缓存 key 前缀 */
     public final static String INDEX_CONFIG_GOODS_KEY = "novamall:index:config:";
 
+    /** 商品 AI 简介缓存 key 前缀 */
+    public final static String GOODS_AI_SUMMARY_KEY = "novamall:goods:ai-summary:";
+
+    /** 商品 AI 简介缓存过期时间(秒)：24 小时，AI 生成内容对一致性不敏感 */
+    public final static long AI_SUMMARY_TTL = 24 * 60 * 60L;
+
     /** 空值缓存过期时间(秒)：短 TTL，防止缓存穿透 */
     public final static long NULL_CACHE_TTL = 60L;
 

@@ -9,6 +9,7 @@
 package com.novamall.api.api.mall;
 
 import io.swagger.annotations.*;
+import com.novamall.api.api.mall.param.AiChatParam;
 import com.novamall.api.api.mall.vo.NovaMallSearchGoodsVO;
 import com.novamall.api.common.Constants;
 import com.novamall.api.common.NovaMallException;
@@ -17,6 +18,7 @@ import com.novamall.api.config.annotation.TokenToMallUser;
 import com.novamall.api.api.mall.vo.NovaMallGoodsDetailVO;
 import com.novamall.api.entity.MallUser;
 import com.novamall.api.entity.NovaMallGoods;
+import com.novamall.api.service.NovaMallAiAssistantService;
 import com.novamall.api.service.NovaMallGoodsService;
 import com.novamall.api.util.*;
 import org.slf4j.Logger;
@@ -25,6 +27,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.validation.Valid;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +41,8 @@ public class NovaMallGoodsAPI {
 
     @Resource
     private NovaMallGoodsService novaMallGoodsService;
+    @Resource
+    private NovaMallAiAssistantService novaMallAiAssistantService;
 
     @GetMapping("/search")
     @ApiOperation(value = "商品搜索接口", notes = "根据关键字和分类id进行搜索")
@@ -89,6 +94,28 @@ public class NovaMallGoodsAPI {
         BeanUtil.copyProperties(goods, goodsDetailVO);
         goodsDetailVO.setGoodsCarouselList(goods.getGoodsCarousel().split(","));
         return ResultGenerator.genSuccessResult(goodsDetailVO);
+    }
+
+    @PostMapping("/goods/{goodsId}/ai-summary")
+    @ApiOperation(value = "AI 商品简介接口", notes = "生成商品卖点简介，LLM 不可用时返回模板化兜底内容")
+    public Result<List<String>> goodsAiSummary(@ApiParam(value = "商品id") @PathVariable("goodsId") Long goodsId, @TokenToMallUser MallUser loginMallUser) {
+        logger.info("goods ai summary api,goodsId={},userId={}", goodsId, loginMallUser.getUserId());
+        if (goodsId < 1) {
+            return ResultGenerator.genFailResult("参数异常");
+        }
+        return ResultGenerator.genSuccessResult(novaMallAiAssistantService.generateGoodsSummary(goodsId));
+    }
+
+    @PostMapping("/goods/{goodsId}/ai-chat")
+    @ApiOperation(value = "AI 商品问答接口", notes = "仅依据商品信息回答，LLM 不可用时返回兜底文案")
+    public Result<String> goodsAiChat(@ApiParam(value = "商品id") @PathVariable("goodsId") Long goodsId,
+                                      @RequestBody @Valid AiChatParam aiChatParam,
+                                      @TokenToMallUser MallUser loginMallUser) {
+        logger.info("goods ai chat api,goodsId={},userId={}", goodsId, loginMallUser.getUserId());
+        if (goodsId < 1) {
+            return ResultGenerator.genFailResult("参数异常");
+        }
+        return ResultGenerator.genSuccessResult(novaMallAiAssistantService.chatAboutGoods(goodsId, aiChatParam.getQuestion()));
     }
 
 }

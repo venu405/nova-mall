@@ -92,6 +92,8 @@ public class NovaMallGoodsServiceImpl implements NovaMallGoodsService {
             // 商品信息变更后删除商品详情及首页配置缓存，保证前台立即生效
             cacheService.delete(CacheConstants.GOODS_DETAIL_KEY + goods.getGoodsId());
             cacheService.deleteByPattern(CacheConstants.INDEX_CONFIG_GOODS_KEY + "*");
+            // AI 简介同步失效，下次访问时重新生成
+            cacheService.delete(CacheConstants.GOODS_AI_SUMMARY_KEY + goods.getGoodsId());
             return ServiceResultEnum.SUCCESS.getResult();
         }
         return ServiceResultEnum.DB_ERROR.getResult();
@@ -126,6 +128,7 @@ public class NovaMallGoodsServiceImpl implements NovaMallGoodsService {
             // 上下架状态变更后删除商品详情及首页配置缓存，保证前台立即生效
             for (Long id : ids) {
                 cacheService.delete(CacheConstants.GOODS_DETAIL_KEY + id);
+                cacheService.delete(CacheConstants.GOODS_AI_SUMMARY_KEY + id);
             }
             cacheService.deleteByPattern(CacheConstants.INDEX_CONFIG_GOODS_KEY + "*");
         }

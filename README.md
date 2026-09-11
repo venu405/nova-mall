@@ -67,6 +67,17 @@ npm run dev
 - **原子回补**：库存回补使用 `stock_num = stock_num + #{num}` 的原子 SQL（`NovaMallGoodsMapper.addBackStockNum`），与下单时 `stock_num = stock_num - #{num} AND stock_num >= #{num}` 的乐观扣减对称。
 - **事务与容错**：单笔订单的取消与回补在同一事务内，回补失败抛异常回滚；单批逐单 try-catch，单笔失败不影响其他订单，等待下一轮扫描重试。
 
+## AI 商品助手
+
+商品详情页内置 AI 助手（后端 `NovaMallAiAssistantService` + `service/ai/LlmClient`，前端 `ProductDetail.vue` 浮动面板），提供两个能力：
+
+- **AI 商品简介**（`POST /api/v1/goods/{id}/ai-summary`）：取商品名称、简介、价格、分类与剥离 HTML 后的详情文本构造 Prompt，生成 3-5 条卖点；结果写入 Redis（`novamall:goods:ai-summary:{id}`，TTL 24 小时），商品编辑/上下架时主动失效。
+- **AI 商品问答**（`POST /api/v1/goods/{id}/ai-chat`）：将商品信息作为上下文注入，System Prompt 强制 grounding 约束——只允许依据商品信息回答，信息不足时明确拒答并建议联系客服，禁止编造参数、价格、售后政策；问答不缓存。
+
+**降级策略**：LLM 调用统一封装在 `LlmClient` 中，`novamall.ai.enabled=false`、未配置 api-key、调用超时或异常时——简介接口返回基于商品字段的模板化兜底内容，问答接口返回友好提示文案；任何情况下 AI 故障不影响商品详情页本身的访问。
+
+**配置方式**（application.properties）：填入 `novamall.ai.api-key` 并将 `novamall.ai.enabled=true` 即启用，默认适配 OpenAI 兼容协议（默认 DeepSeek：`base-url=https://api.deepseek.com`、`model=deepseek-chat`），可通过 `novamall.ai.timeout-seconds` 控制超时。Token 成本控制：问题截断 500 字、详情文本截断 2000 字、低温度（0.3）输出。
+
 ## 自动化测试
 
 后端核心链路配有接口级自动化测试（JUnit 5 + Spring Boot Test，`@SpringBootTest` 随机端口 + TestRestTemplate 走真实 HTTP 请求），位于 `nova-mall-api/src/test/java/com/novamall/api/`，共 5 个测试类 7 个用例：

@@ -13,6 +13,14 @@ export function getDetail(id) {
   return axios.get(`/goods/detail/${id}`);
 }
 
+export function getAiSummary(id) {
+  return axios.post(`/goods/${id}/ai-summary`);
+}
+
+export function aiChat(id, question) {
+  return axios.post(`/goods/${id}/ai-chat`, { question });
+}
+
 export function getCategory() {
   return axios.get('/categories');
 }
